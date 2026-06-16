@@ -74,7 +74,7 @@ struct SkillDetailView: View {
                 Button {
                     state.updateSkill(skill)
                 } label: {
-                    if state.actionStatus.isRunning {
+                    if state.actionStatus.isRunning(.update(skill.id)) {
                         HStack(spacing: 5) { ProgressView().controlSize(.small); Text("Updating…") }
                     } else {
                         Label("Update", systemImage: "arrow.triangle.2.circlepath")
@@ -153,7 +153,7 @@ struct SkillDetailView: View {
                     Button {
                         wireTarget = agent
                     } label: {
-                        if state.actionStatus.isRunning {
+                        if state.actionStatus.isRunning(.wire(skill.id, agent)) {
                             HStack(spacing: 5) {
                                 ProgressView().controlSize(.small)
                                 Text("Wiring…")

@@ -11,14 +11,51 @@ enum LibraryFilter: String, CaseIterable, Hashable {
     var label: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
 }
 
+/// Identifies which mutation a status refers to, so per-row UI reacts only to its OWN
+/// action (one global `actionStatus` would otherwise light up every wire button at once,
+/// and let a background reload dismiss the install sheet).
+enum ActionID: Equatable {
+    case install
+    case fixAllDrift
+    case wire(Skill.ID, Agent)
+    case update(Skill.ID)
+    case remove(Skill.ID)
+}
+
 /// Status of an in-flight mutation — drives spinners, inline confirmations and the alert.
+/// Each case carries the `ActionID` it belongs to.
 enum ActionStatus: Equatable {
     case idle
-    case running(String)
-    case success(String)
-    case failure(String)
+    case running(ActionID, String)
+    case success(ActionID, String)
+    case failure(ActionID, String)
 
+    /// Any mutation in flight — used for single-flight disabling across the whole UI.
     var isRunning: Bool { if case .running = self { return true }; return false }
+
+    /// Is THIS specific action the one currently running? (scopes spinners to one button)
+    func isRunning(_ id: ActionID) -> Bool {
+        if case .running(let a, _) = self { return a == id }
+        return false
+    }
+
+    /// The running label, but only for the given action.
+    func runningLabel(_ id: ActionID) -> String? {
+        if case .running(let a, let label) = self, a == id { return label }
+        return nil
+    }
+
+    /// The failure message, but only for the given action.
+    func failureMessage(_ id: ActionID) -> String? {
+        if case .failure(let a, let msg) = self, a == id { return msg }
+        return nil
+    }
+
+    /// Did the given action just succeed? (used by the install sheet to self-dismiss)
+    func didSucceed(_ id: ActionID) -> Bool {
+        if case .success(let a, _) = self { return a == id }
+        return false
+    }
 }
 
 @MainActor
@@ -216,17 +253,17 @@ final class AppState: ObservableObject {
     /// Centralizes the off-main CLI run + status reporting. `work` runs detached; status
     /// and reload land back on the main actor. `onSuccessSelect` re-selects a skill by
     /// name once it (re)appears after the reload.
-    private func perform(_ label: String, onSuccessSelect: String? = nil, _ work: @escaping () -> CLIResult) {
-        actionStatus = .running(label)
+    private func perform(_ id: ActionID, _ label: String, onSuccessSelect: String? = nil, _ work: @escaping () -> CLIResult) {
+        actionStatus = .running(id, label)
         lastError = nil
         Task.detached(priority: .userInitiated) {
             let r = work()
             await MainActor.run {
                 if r.ok {
-                    self.actionStatus = .success(label)
+                    self.actionStatus = .success(id, label)
                     if let sel = onSuccessSelect { self.pendingSelectName = sel }
                 } else {
-                    self.actionStatus = .failure(r.message)
+                    self.actionStatus = .failure(id, r.message)
                     self.lastError = r.message
                 }
                 self.reload()
@@ -238,7 +275,7 @@ final class AppState: ObservableObject {
     func install(ref: String, skill: String? = nil, agents: [Agent] = [], copy: Bool = false) {
         let scope = currentScope
         let selectHint = skill ?? Self.lastPathComponent(of: ref)
-        perform("Installing", onSuccessSelect: selectHint) {
+        perform(.install, "Installing", onSuccessSelect: selectHint) {
             SkillsCLIService.add(ref: ref, skill: skill, agents: agents, scope: scope, copy: copy)
         }
     }
@@ -247,7 +284,7 @@ final class AppState: ObservableObject {
     func updateSkill(_ skill: Skill) {
         let scope = skill.scope
         let name = skill.name
-        perform("Updating \(name)") { SkillsCLIService.update(name: name, scope: scope) }
+        perform(.update(skill.id), "Updating \(name)") { SkillsCLIService.update(name: name, scope: scope) }
     }
 
     /// REMOVE a skill fully, or unwire it from specific agents when `agents` is non-empty.
@@ -255,7 +292,7 @@ final class AppState: ObservableObject {
         let scope = skill.scope
         let name = skill.name
         let label = agents.isEmpty ? "Removing \(name)" : "Unwiring \(name)"
-        perform(label) { SkillsCLIService.remove(name: name, agents: agents, scope: scope) }
+        perform(.remove(skill.id), label) { SkillsCLIService.remove(name: name, agents: agents, scope: scope) }
     }
 
     /// "owner/repo" → "repo" select hint for post-install reselection.
@@ -272,13 +309,14 @@ final class AppState: ObservableObject {
     /// missing drift case) rather than the CLI — `skills add <localPath>` is built for
     /// remote refs and may re-clone an already-canonical skill.
     func wire(_ skill: Skill, into agent: Agent) {
-        actionStatus = .running("Wiring \(agent.displayName)")
+        let id = ActionID.wire(skill.id, agent)
+        actionStatus = .running(id, "Wiring \(agent.displayName)")
         lastError = nil
         Task.detached(priority: .userInitiated) {
             let r = Self.rawSymlinkWire(skill, into: agent)
             await MainActor.run {
-                if r.ok { self.actionStatus = .success("Wired \(agent.displayName)") }
-                else { self.actionStatus = .failure(r.message); self.lastError = r.message }
+                if r.ok { self.actionStatus = .success(id, "Wired \(agent.displayName)") }
+                else { self.actionStatus = .failure(id, r.message); self.lastError = r.message }
                 self.reload()
             }
         }
@@ -288,7 +326,7 @@ final class AppState: ObservableObject {
     func fixAllDrift() {
         let targets = skills.filter { !$0.driftMissing.isEmpty }
         guard !targets.isEmpty else { return }
-        actionStatus = .running("Fixing drift")
+        actionStatus = .running(.fixAllDrift, "Fixing drift")
         lastError = nil
         Task.detached(priority: .userInitiated) {
             var failures = 0
@@ -300,13 +338,13 @@ final class AppState: ObservableObject {
                 }
                 done += 1
                 let progress = done, total = targets.count
-                await MainActor.run { self.actionStatus = .running("Fixed \(progress) of \(total)") }
+                await MainActor.run { self.actionStatus = .running(.fixAllDrift, "Fixed \(progress) of \(total)") }
             }
             let failureCount = failures, total = targets.count
             await MainActor.run {
                 self.actionStatus = failureCount == 0
-                    ? .success("Fixed drift on \(total) skills")
-                    : .failure("\(failureCount) failed")
+                    ? .success(.fixAllDrift, "Fixed drift on \(total) skills")
+                    : .failure(.fixAllDrift, "\(failureCount) failed")
                 if failureCount > 0 { self.lastError = "\(failureCount) skill(s) failed to wire." }
                 self.reload()
             }

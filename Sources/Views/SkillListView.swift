@@ -29,7 +29,7 @@ struct SkillListView: View {
                     Button {
                         state.fixAllDrift()
                     } label: {
-                        if case .running(let label) = state.actionStatus {
+                        if let label = state.actionStatus.runningLabel(.fixAllDrift) {
                             Text(label)
                         } else {
                             Text("Fix all drift")
@@ -113,15 +113,15 @@ struct InstallSheet: View {
                     .font(.caption).foregroundStyle(Theme.drift)
             }
 
-            // In-flight / failure feedback owned by this submission.
+            // In-flight / failure feedback owned by THIS submission (scoped to .install,
+            // so a background reload or overlapping mutation can't alter it).
             if didSubmit {
-                switch state.actionStatus {
-                case .running(let label):
+                if let label = state.actionStatus.runningLabel(.install) {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text(label).font(.caption).foregroundStyle(.secondary)
                     }
-                case .failure(let msg):
+                } else if let msg = state.actionStatus.failureMessage(.install) {
                     Text(msg)
                         .font(.caption)
                         .foregroundStyle(Theme.drift)
@@ -129,8 +129,6 @@ struct InstallSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
                         .background(Theme.drift.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
-                default:
-                    EmptyView()
                 }
             }
 
@@ -152,9 +150,9 @@ struct InstallSheet: View {
         }
         .padding(20)
         .frame(width: 420)
-        // Dismiss once this install succeeds.
+        // Dismiss once THIS install succeeds (ignores other actions' success).
         .onChange(of: state.actionStatus) { _, status in
-            if didSubmit, case .success = status { dismiss() }
+            if didSubmit, status.didSucceed(.install) { dismiss() }
         }
     }
 }

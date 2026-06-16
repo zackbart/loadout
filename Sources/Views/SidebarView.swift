@@ -115,18 +115,8 @@ struct SidebarView: View {
             Image(systemName: icon).foregroundStyle(filter == .drift && n > 0 ? Theme.drift : .secondary)
             Text(filter.label)
             Spacer()
-            // Trailing fix-all affordance on the Drift row when there's drift to fix.
-            if filter == .drift && n > 0 {
-                Button {
-                    state.fixAllDrift()
-                } label: {
-                    Image(systemName: "wrench.and.screwdriver")
-                }
-                .buttonStyle(.borderless)
-                .controlSize(.small)
-                .disabled(state.actionStatus.isRunning || state.isLoading)
-                .help("Fix all drift")
-            }
+            // Fix-all lives in the list toolbar; no nested button here (a tap inside the
+            // row's own Button is ambiguous and would also toggle the filter).
             countLabel(n)
         }
     }
