@@ -37,23 +37,22 @@ struct SidebarView: View {
                         state.reload()
                     }
                 }
-
-                if state.scopeMode == .project {
-                    Button {
-                        state.chooseProject()
-                    } label: {
-                        Label(state.selectedProject?.lastPathComponent ?? "Choose project…",
-                              systemImage: "folder")
-                    }
-                    ForEach(state.recentProjects.prefix(5), id: \.self) { url in
-                        Button(url.lastPathComponent) { state.setProject(url) }
-                            .buttonStyle(.plain)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
             .selectionDisabled()
+
+            // Saved projects — persist indefinitely; click to switch, right-click to remove.
+            if state.scopeMode == .project || !state.savedProjects.isEmpty {
+                Section("Projects") {
+                    ForEach(state.savedProjects, id: \.self) { url in
+                        projectRow(url)
+                    }
+                    Button { state.chooseProject() } label: {
+                        Label("Add project…", systemImage: "plus")
+                    }
+                    .help("Choose a project folder to scan and keep")
+                }
+                .selectionDisabled()
+            }
 
             Section("Library") {
                 row(.library(.all), "All", systemImage: "square.stack", count: state.skills.count)
@@ -80,6 +79,35 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .tint(Agent.claude.color) // Liquid Glass selection picks up the accent
+    }
+
+    /// A saved-project row: switch on click, mark the active one, remove via context menu.
+    @ViewBuilder
+    private func projectRow(_ url: URL) -> some View {
+        let active = state.scopeMode == .project && state.selectedProject?.path == url.path
+        Button { state.setProject(url) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: active ? "folder.fill" : "folder")
+                    .foregroundStyle(active ? Agent.claude.color : .secondary)
+                Text(url.lastPathComponent)
+                    .fontWeight(active ? .semibold : .regular)
+                    .lineLimit(1).truncationMode(.middle)
+                Spacer()
+                if active {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Agent.claude.color)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(url.path)
+        .contextMenu {
+            Button(role: .destructive) { state.removeProject(url) } label: {
+                Label("Remove from list", systemImage: "trash")
+            }
+        }
     }
 
     // MARK: - Rows

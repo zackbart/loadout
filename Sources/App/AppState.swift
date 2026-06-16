@@ -72,7 +72,8 @@ final class AppState: ObservableObject {
     @Published var kind: ResourceKind = .skill
     @Published var scopeMode: ScopeMode = .global
     @Published var selectedProject: URL?
-    @Published var recentProjects: [URL] = []
+    /// Projects the user has saved — persisted indefinitely, switchable, removable.
+    @Published var savedProjects: [URL] = []
     // Single-select sidebar filter (native macOS list selection). Reconciles the skill
     // selection on change so the detail pane never shows a filtered-out skill.
     @Published var sidebarFilter: SidebarFilter = .library(.all) { didSet { reconcileSelection() } }
@@ -91,12 +92,12 @@ final class AppState: ObservableObject {
     @Published var pendingSelectName: String?           // name to select once it appears post-reload
 
     private var watcher: FileWatcher?
-    private let recentsKey = "recentProjects"
+    private let projectsKey = "recentProjects" // key kept for continuity with existing data
     /// Bumped on every reload; a detached scan only applies if it's still the latest.
     private var reloadGeneration = 0
 
     init() {
-        recentProjects = (UserDefaults.standard.array(forKey: recentsKey) as? [String])?
+        savedProjects = (UserDefaults.standard.array(forKey: projectsKey) as? [String])?
             .map { URL(fileURLWithPath: $0) } ?? []
         watcher = FileWatcher { [weak self] in self?.reload() }
     }
@@ -200,15 +201,33 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Switch to `url`. New projects are saved (persist indefinitely); switching to an
+    /// already-saved one keeps the list order stable so positions don't jump around.
     func setProject(_ url: URL) {
         resetFilters()
         selectedProject = url
         scopeMode = .project
-        recentProjects.removeAll { $0.path == url.path }
-        recentProjects.insert(url, at: 0)
-        recentProjects = Array(recentProjects.prefix(8))
-        UserDefaults.standard.set(recentProjects.map(\.path), forKey: recentsKey)
+        if !savedProjects.contains(where: { $0.path == url.path }) {
+            savedProjects.insert(url, at: 0)
+            persistProjects()
+        }
         reload()
+    }
+
+    /// Forget a saved project. If it was the current one, fall back to another saved
+    /// project, or to Global if none remain.
+    func removeProject(_ url: URL) {
+        savedProjects.removeAll { $0.path == url.path }
+        persistProjects()
+        if selectedProject?.path == url.path {
+            selectedProject = savedProjects.first
+            if selectedProject == nil { scopeMode = .global }
+            reload()
+        }
+    }
+
+    private func persistProjects() {
+        UserDefaults.standard.set(savedProjects.map(\.path), forKey: projectsKey)
     }
 
     // MARK: - Loading
