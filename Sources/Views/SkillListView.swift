@@ -173,6 +173,14 @@ struct SkillRow: View {
                         .help("Declared for \(skill.driftMissing.map(\.displayName).joined(separator: ", ")) but not wired")
                 }
                 Spacer()
+                if let loc = skill.locationBadge {
+                    Text(loc)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                        .help("Project location")
+                }
                 Image(systemName: skill.gitStatus.systemImage)
                     .font(.caption2)
                     .foregroundStyle(skill.gitStatus.color)

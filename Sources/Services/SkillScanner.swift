@@ -98,12 +98,13 @@ enum SkillScanner {
             }
         }
 
-        return finalize(byCanonical, linkPaths: linkPaths)
+        return finalize(byCanonical, linkPaths: linkPaths, projectRoot: scope.projectRoot)
     }
 
     private static func finalize(
         _ byCanonical: [String: Skill],
-        linkPaths: [String: Set<String>]
+        linkPaths: [String: Set<String>],
+        projectRoot: String?
     ) -> [Skill] {
         var skills = Array(byCanonical.values)
 
@@ -112,9 +113,14 @@ enum SkillScanner {
         for (_, links) in linkPaths { allPaths.formUnion(links) }
         let git = GitStatusService.classify(paths: Array(allPaths))
 
-        // Diverged — same name across ≥2 distinct canonical paths in this scope.
-        var nameCounts: [String: Int] = [:]
-        for s in skills { nameCounts[s.name, default: 0] += 1 }
+        // Project-relative locations, from the (unresolved) reference paths.
+        if let root = projectRoot {
+            for i in skills.indices {
+                let links = linkPaths[skills[i].canonicalPath] ?? []
+                let locs = Set(links.map { location(ofEntry: $0, underRoot: root) })
+                skills[i].projectLocations = locs.sorted()
+            }
+        }
 
         for i in skills.indices {
             let canon = skills[i].canonicalPath
@@ -123,12 +129,39 @@ enum SkillScanner {
             if let links = linkPaths[canon] {
                 skills[i].linksDiverge = links.contains { (git[$0] ?? status) != status }
             }
-            skills[i].diverged = (nameCounts[skills[i].name] ?? 0) > 1
+            // Diverged = a *genuine* clash: another skill with the same name that shares a
+            // location. Same name in different monorepo subpackages is expected, not drift.
+            // In global scope every skill's location set is {""}, so this reduces to the
+            // original "same name across ≥2 canonical paths" rule.
+            let myLocs = locationKeys(skills[i])
+            skills[i].diverged = skills.contains { other in
+                other.canonicalPath != canon
+                    && other.name == skills[i].name
+                    && !locationKeys(other).isDisjoint(with: myLocs)
+            }
         }
 
         return skills.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
+    }
+
+    /// Location keys for divergence comparison; empty (global) collapses to a single
+    /// shared "" bucket so global same-name skills still count as diverged.
+    private static func locationKeys(_ s: Skill) -> Set<String> {
+        s.projectLocations.isEmpty ? [""] : Set(s.projectLocations)
+    }
+
+    /// Project-relative subpackage of a skill reference path `<base>/.X/skills/<name>`.
+    /// "" = the chosen root; "↑ <dir>" = an ancestor above it.
+    private static func location(ofEntry entry: String, underRoot root: String) -> String {
+        var base = URL(fileURLWithPath: entry)
+        for _ in 0..<3 { base = base.deletingLastPathComponent() } // drop <name>/skills/.X
+        let bp = base.standardizedFileURL.path
+        let rp = URL(fileURLWithPath: root).standardizedFileURL.path
+        if bp == rp { return "" }
+        if bp.hasPrefix(rp + "/") { return String(bp.dropFirst(rp.count + 1)) }
+        return "↑ " + base.lastPathComponent
     }
 
     // MARK: - Helpers

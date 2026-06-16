@@ -60,6 +60,9 @@ struct SkillDetailView: View {
 
     private var managementRow: some View {
         HStack(spacing: 8) {
+            if let loc = skill.locationBadge {
+                pill(loc, systemImage: "folder", color: .secondary)
+            }
             pill(skill.gitStatus.label, systemImage: skill.gitStatus.systemImage, color: skill.gitStatus.color)
             if skill.linksDiverge {
                 pill("links diverge", systemImage: "arrow.triangle.branch", color: Theme.drift)

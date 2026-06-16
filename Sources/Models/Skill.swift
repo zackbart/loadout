@@ -39,6 +39,18 @@ struct Skill: AgentResource {
 
     var provenance: SkillProvenance?
 
+    /// Project-relative subpackage paths this skill is referenced from (project scope only;
+    /// empty for global). "" means the chosen project root; "↑ …" means an ancestor dir.
+    /// A monorepo skill referenced from one place has a single entry.
+    var projectLocations: [String] = []
+
+    /// A short label for where this lives in the project, or nil in global scope.
+    var locationBadge: String? {
+        guard !projectLocations.isEmpty else { return nil }
+        let labels = projectLocations.map { $0.isEmpty ? "· root" : $0 }
+        return labels.count == 1 ? labels[0] : "\(labels[0]) +\(labels.count - 1)"
+    }
+
     // Derived signals (filled in by the scanner)
     var gitStatus: GitStatus = .notInRepo
     /// True when the agent-dir symlinks differ in tracked-ness from the canonical files.
