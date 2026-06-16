@@ -60,6 +60,22 @@ struct Skill: AgentResource {
         return labels.count == 1 ? labels[0] : "\(labels[0]) +\(labels.count - 1)"
     }
 
+    /// Tooltip for the location badge: the project folder(s) this skill is referenced from.
+    var locationHelp: String? {
+        guard !projectLocations.isEmpty else { return nil }
+        let names = projectLocations.map { $0.isEmpty ? "the project root" : $0 }
+        return "Referenced from " + names.joined(separator: ", ")
+    }
+
+    /// Sidebar source groups. CLI-managed skills group by their provenance source; local
+    /// (manual) skills group by the project folder they live in ("Local · <subpackage>"),
+    /// so manual skills stay browsable by origin. Global-scope locals fall into one "Local".
+    var sourceGroups: [String] {
+        if let src = provenance?.source, !src.isEmpty { return [src] }
+        if projectLocations.isEmpty { return ["Local"] }
+        return projectLocations.map { "Local · " + ($0.isEmpty ? "root" : $0) }
+    }
+
     // Derived signals (filled in by the scanner)
     var gitStatus: GitStatus = .notInRepo
     /// True when the agent-dir symlinks differ in tracked-ness from the canonical files.

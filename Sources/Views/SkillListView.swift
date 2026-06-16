@@ -174,7 +174,10 @@ struct SkillRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text(skill.name).fontWeight(.medium)
-                if skill.diverged { Tag(text: "diverged", color: Theme.drift) }
+                if skill.diverged {
+                    Tag(text: "diverged", color: Theme.drift)
+                        .help("Another skill with this name exists in this scope (a same-name clash).")
+                }
                 if !skill.driftMissing.isEmpty {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption2)
@@ -188,12 +191,12 @@ struct SkillRow: View {
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                         .truncationMode(.head)
-                        .help("Project location")
+                        .help(skill.locationHelp ?? "Project location")
                 }
                 Image(systemName: skill.gitStatus.systemImage)
                     .font(.caption2)
                     .foregroundStyle(skill.gitStatus.color)
-                    .help("Git: \(skill.gitStatus.label)\(skill.linksDiverge ? " · links diverge" : "")")
+                    .help("\(skill.gitStatus.label) — \(skill.gitStatus.helpText)\(skill.linksDiverge ? " · links diverge" : "")")
             }
             if let s = skill.summary {
                 Text(s).font(.caption).foregroundStyle(.secondary).lineLimit(2)

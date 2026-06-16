@@ -45,7 +45,10 @@ struct SkillDetailView: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 9) {
                 Text(skill.name).font(.largeTitle).fontWeight(.bold)
-                if skill.diverged { Tag(text: "diverged", color: Theme.drift) }
+                if skill.diverged {
+                    Tag(text: "diverged", color: Theme.drift)
+                        .help("Another skill with this name exists in this scope (a same-name clash).")
+                }
             }
             if let s = skill.summary {
                 Text(s).font(.title3).foregroundStyle(.secondary)
@@ -63,11 +66,13 @@ struct SkillDetailView: View {
         HStack(spacing: 8) {
             if let loc = skill.locationBadge {
                 pill(loc, systemImage: "folder", color: .secondary)
+                    .help(skill.locationHelp ?? "Where this skill lives in the project")
             }
             pill(skill.gitStatus.label, systemImage: skill.gitStatus.systemImage, color: skill.gitStatus.color)
-                .help("Git status: \(skill.gitStatus.label)")
+                .help("\(skill.gitStatus.label) — \(skill.gitStatus.helpText)")
             if skill.linksDiverge {
                 pill("links diverge", systemImage: "arrow.triangle.branch", color: Theme.drift)
+                    .help("The agent-dir symlink(s) differ in git status from the skill's canonical files.")
             }
             pill(skill.isCLIManaged ? "skills.sh" : "Manual",
                  systemImage: skill.isCLIManaged ? "terminal" : "hand.raised",

@@ -146,9 +146,14 @@ final class AppState: ObservableObject {
     var sources: [(name: String, count: Int)] {
         var m: [String: Int] = [:]
         for s in skills {
-            if let src = s.provenance?.source, !src.isEmpty { m[src, default: 0] += 1 }
+            for g in s.sourceGroups { m[g, default: 0] += 1 }
         }
-        return m.sorted { $0.key < $1.key }.map { ($0.key, $0.value) }
+        // CLI sources first, then the "Local · …" folder groups; alphabetical within each.
+        return m.sorted { a, b in
+            let al = a.key.hasPrefix("Local"), bl = b.key.hasPrefix("Local")
+            if al != bl { return !al }
+            return a.key.localizedCaseInsensitiveCompare(b.key) == .orderedAscending
+        }.map { ($0.key, $0.value) }
     }
 
     var filteredSkills: [Skill] {
@@ -160,7 +165,7 @@ final class AppState: ObservableObject {
         case .agent(let agent):
             list = list.filter { $0.availableAgents.contains(agent) || $0.declaredAgents.contains(agent) }
         case .source(let src):
-            list = list.filter { $0.provenance?.source == src }
+            list = list.filter { $0.sourceGroups.contains(src) }
         }
         if !searchText.isEmpty {
             let q = searchText.lowercased()

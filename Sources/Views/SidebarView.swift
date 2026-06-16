@@ -71,7 +71,9 @@ struct SidebarView: View {
             if !state.sources.isEmpty {
                 Section("Sources") {
                     ForEach(state.sources, id: \.name) { src in
-                        row(.source(src.name), src.name, systemImage: "shippingbox",
+                        let isLocal = src.name.hasPrefix("Local")
+                        row(.source(src.name), src.name,
+                            systemImage: isLocal ? "folder" : "shippingbox",
                             count: src.count, truncate: true)
                     }
                 }

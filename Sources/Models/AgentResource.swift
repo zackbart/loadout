@@ -45,6 +45,16 @@ enum GitStatus: String, Hashable {
         }
     }
 
+    /// One-line explanation for hover tooltips.
+    var helpText: String {
+        switch self {
+        case .tracked: return "Committed to git — versioned and shared with the repo."
+        case .untracked: return "Inside a git repo but not committed yet."
+        case .ignored: return "Inside a git repo but excluded by .gitignore."
+        case .notInRepo: return "Not inside any git repository (e.g. the global ~/.agents store)."
+        }
+    }
+
     var color: Color {
         switch self {
         case .tracked: return Color(hex: 0x2BA160)
