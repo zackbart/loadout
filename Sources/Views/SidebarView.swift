@@ -40,8 +40,8 @@ struct SidebarView: View {
             }
             .selectionDisabled()
 
-            // Saved projects — persist indefinitely; click to switch, right-click to remove.
-            if state.scopeMode == .project || !state.savedProjects.isEmpty {
+            // Saved projects live under the Project tab only — hidden in Global scope.
+            if state.scopeMode == .project {
                 Section("Projects") {
                     ForEach(state.savedProjects, id: \.self) { url in
                         projectRow(url)
