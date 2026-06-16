@@ -2,7 +2,8 @@ import Foundation
 import SwiftUI
 import HerdrKit
 
-/// Screen 3: read a pane's output and send input. Scrollback comes from
+/// Screen 3: read a pane's output and send input, rendered as a real terminal —
+/// a dark scrollback surface and a prompt-style input bar. Scrollback comes from
 /// `pane read` plus live `output` events; the input bar sends text + Enter (or
 /// individual keys).
 struct PaneView: View {
@@ -15,12 +16,17 @@ struct PaneView: View {
     private var pane: Pane? { session.pane(paneID) }
     private var lines: [String] { session.outputs[paneID] ?? [] }
 
+    private let quickKeys = ["Enter", "Esc", "Ctrl-C", "Tab", "Up", "Down"]
+
     var body: some View {
         VStack(spacing: 0) {
             scrollback
-            Divider()
+            Rectangle()
+                .fill(Theme.terminalDim.opacity(0.18))
+                .frame(height: 1)
             inputBar
         }
+        .background(Theme.terminalBG, ignoresSafeAreaEdges: .bottom)
         .navigationTitle(pane?.title ?? paneID.rawValue)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -37,17 +43,24 @@ struct PaneView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
+                    if lines.isEmpty {
+                        Text("— no output yet —")
+                            .font(Theme.monospaced)
+                            .foregroundStyle(Theme.terminalDim)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                         Text(line.strippingANSI())
                             .font(Theme.monospaced)
+                            .foregroundStyle(Theme.terminalText)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Color.clear.frame(height: 1).id(bottomAnchor)
                 }
-                .padding(12)
+                .padding(14)
             }
-            .background(Color(.systemBackground))
+            .background(Theme.terminalBG)
             .onChange(of: lines.count) {
                 withAnimation { proxy.scrollTo(bottomAnchor, anchor: .bottom) }
             }
@@ -56,36 +69,60 @@ struct PaneView: View {
     }
 
     private var inputBar: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             // Quick keys for common control sequences.
-            HStack(spacing: 8) {
-                ForEach(["Enter", "Esc", "Ctrl-C", "Up", "Down"], id: \.self) { key in
-                    Button(key) { Task { await session.sendKeys(key, to: paneID) } }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .font(.caption.monospaced())
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(quickKeys, id: \.self) { key in
+                        Button(key) { Task { await session.sendKeys(key, to: paneID) } }
+                            .font(Theme.mono(12, .medium))
+                            .foregroundStyle(Theme.terminalText)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 6)
+                            .background(Theme.terminalSurface, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Theme.terminalDim.opacity(0.25)))
+                    }
                 }
+                .padding(.horizontal, 1)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 8) {
-                TextField("Send input…", text: $input, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .font(Theme.monospaced)
-                    .focused($inputFocused)
-                    .lineLimit(1...4)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .onSubmit(send)
-                Button(action: send) {
-                    Image(systemName: "paperplane.fill")
+            HStack(spacing: 10) {
+                HStack(spacing: 7) {
+                    Text(">")
+                        .font(Theme.mono(15, .bold))
+                        .foregroundStyle(Theme.prompt)
+                    TextField("", text: $input,
+                              prompt: Text("send input…").foregroundColor(Theme.terminalDim),
+                              axis: .vertical)
+                        .font(Theme.monospaced)
+                        .foregroundStyle(Theme.terminalText)
+                        .focused($inputFocused)
+                        .lineLimit(1...4)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .tint(Theme.prompt)
+                        .onSubmit(send)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(Theme.terminalSurface, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+
+                Button(action: send) {
+                    Image(systemName: "arrow.up")
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(Theme.terminalBG)
+                        .frame(width: 38, height: 38)
+                        .background(canSend ? Theme.prompt : Theme.terminalDim, in: Circle())
+                }
+                .disabled(!canSend)
             }
         }
-        .padding(12)
-        .background(.bar)
+        .padding(14)
+        .background(Theme.terminalBG)
+    }
+
+    private var canSend: Bool {
+        !input.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private let bottomAnchor = "herdr.pane.bottom"

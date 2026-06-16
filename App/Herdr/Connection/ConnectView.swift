@@ -14,21 +14,43 @@ struct ConnectView: View {
         NavigationStack {
             List {
                 Section {
+                    BrandHero()
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 28, leading: 16, bottom: 12, trailing: 16))
+                }
+
+                Section {
                     Button {
                         Task { await app.connectDemo() }
                     } label: {
-                        Label("Open demo workspace", systemImage: "play.circle.fill")
+                        HStack(spacing: 12) {
+                            Image(systemName: "play.fill")
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(Theme.prompt)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Open demo workspace")
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(.primary)
+                                Text("Realistic sample data — no server")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                     .disabled(app.isConnecting)
                 } header: {
-                    Text("Quick start")
-                } footer: {
-                    Text("Explore the app with realistic sample data and live status updates — no server required.")
+                    SectionEyebrow("quick start")
                 }
 
-                Section("Hosts") {
+                Section {
                     if store.hosts.isEmpty {
                         Text("No hosts yet. Add the machine where Herdr runs.")
+                            .font(.callout)
                             .foregroundStyle(.secondary)
                     }
                     ForEach(store.hosts) { host in
@@ -44,22 +66,26 @@ struct ConnectView: View {
                             }
                             Button { editingHost = host } label: {
                                 Label("Edit", systemImage: "pencil")
-                            }.tint(.blue)
+                            }.tint(Theme.ink)
                         }
                     }
+                } header: {
+                    SectionEyebrow("hosts")
                 }
 
                 if case .failed(let message) = app.phase {
                     Section {
                         Label(message, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                            .font(.callout)
+                            .foregroundStyle(Theme.blocked)
                     }
                 }
             }
-            .navigationTitle("Herdr")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingNewHost = true } label: { Image(systemName: "plus") }
+                        .tint(Theme.ink)
                 }
             }
             .overlay {
@@ -78,17 +104,59 @@ struct ConnectView: View {
                 }
             }
         }
+        .tint(Theme.prompt)
+    }
+}
+
+/// The logo mark, mono wordmark, and tagline — the app's identity, shown once
+/// at the top of the connect screen.
+private struct BrandHero: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image("Logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 78, height: 78)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Theme.ink.opacity(0.08))
+                )
+                .shadow(color: Theme.ink.opacity(0.18), radius: 10, y: 5)
+
+            VStack(spacing: 3) {
+                Text("herdr")
+                    .font(Theme.mono(32, .bold))
+                    .tracking(0.5)
+                    .foregroundStyle(Theme.ink)
+                Text("mind the flock from anywhere")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
 private struct HostRow: View {
     let host: Host
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(host.displayName).font(.body.weight(.medium))
-            Text(host.subtitle).font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: 12) {
+            Image(systemName: "terminal.fill")
+                .font(.callout)
+                .foregroundStyle(Theme.ink.opacity(0.55))
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(host.displayName).font(.body.weight(.medium))
+                Text(host.subtitle).font(Theme.mono(12)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
     }
 }
 
@@ -96,13 +164,15 @@ private struct ConnectingOverlay: View {
     let label: String
     var body: some View {
         ZStack {
-            Color(.systemBackground).opacity(0.7).ignoresSafeArea()
-            VStack(spacing: 12) {
+            Color(.systemBackground).opacity(0.75).ignoresSafeArea()
+            VStack(spacing: 14) {
                 ProgressView()
-                Text("Connecting to \(label)…").font(.callout).foregroundStyle(.secondary)
+                Text("Connecting to \(label)…")
+                    .font(Theme.mono(13))
+                    .foregroundStyle(.secondary)
             }
-            .padding(24)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .padding(28)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 }
@@ -146,11 +216,15 @@ private struct HostEditor: View {
                     }
                 }
 
-                Section("Herdr socket") {
-                    TextField("Socket path", text: $host.socketPath)
+                Section {
+                    TextField("Socket path (optional)", text: $host.socketPath)
                         .font(.caption.monospaced())
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                } header: {
+                    Text("Herdr socket")
+                } footer: {
+                    Text("Leave blank to auto-detect. Herdr's socket is found automatically under ~/.config/herdr — set this only to target a specific session or a non-standard path.")
                 }
             }
             .navigationTitle(host.hostname.isEmpty ? "New host" : host.displayName)

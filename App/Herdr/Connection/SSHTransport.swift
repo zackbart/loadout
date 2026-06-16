@@ -71,9 +71,27 @@ public actor SSHTransport: HerdrTransport {
         }
         self.client = client
 
+        // Resolve the socket path: honour an explicit override, otherwise probe
+        // the documented locations on the remote host so the user never has to
+        // know where Herdr keeps its socket.
+        let socketPath: String
+        let override = host.socketPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !override.isEmpty {
+            socketPath = override
+        } else {
+            let found = try await discoverSocketPaths(client: client)
+            guard let chosen = found.first else {
+                throw HerdrError.connectionFailed(
+                    "Couldn't find a running Herdr socket on \(host.displayName) (looked under "
+                    + "~/.config/herdr). Is Herdr running there?"
+                )
+            }
+            socketPath = chosen
+        }
+
         // Open the bridge exec channel and suspend until it's live (so the first
         // `send` has a writer) or it fails during setup.
-        let command = Self.bridgeCommand(socketPath: host.socketPath)
+        let command = Self.bridgeCommand(socketPath: socketPath)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.connectContinuation = continuation
             self.channelTask = Task { [weak self] in
@@ -185,6 +203,30 @@ public actor SSHTransport: HerdrTransport {
                 )
             }
         }
+    }
+
+    /// Probe the remote host for live Herdr sockets, most-preferred first. Mirrors
+    /// Herdr's own resolution order (per the socket-API docs): the
+    /// `HERDR_SOCKET_PATH` override, then the default session socket, then any
+    /// named session under `~/.config/herdr/sessions/<name>/`. Only paths that are
+    /// actually sockets (`test -S`) are returned. Wrapped in `sh -c` so it's POSIX
+    /// regardless of the user's login shell.
+    private func discoverSocketPaths(client: SSHClient) async throws -> [String] {
+        let probe = #"sh -c 'for p in "$HERDR_SOCKET_PATH" "$HOME/.config/herdr/herdr.sock" "$HOME"/.config/herdr/sessions/*/herdr.sock; do [ -S "$p" ] && echo "$p"; done'"#
+        let output: ByteBuffer
+        do {
+            output = try await client.executeCommand(probe)
+        } catch {
+            throw HerdrError.connectionFailed(
+                "Couldn't search for the Herdr socket on \(host.displayName): \(error)"
+            )
+        }
+        let text = output.getString(at: output.readerIndex, length: output.readableBytes) ?? ""
+        var seen = Set<String>()
+        return text
+            .split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 
     /// Shell command run on the remote host to bridge stdio to the Herdr socket.

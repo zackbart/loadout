@@ -15,12 +15,14 @@ struct WorkspaceDetailView: View {
             if let workspace {
                 List {
                     ForEach(workspace.tabs) { tab in
-                        Section(tab.label) {
+                        Section {
                             ForEach(tab.panes) { pane in
                                 NavigationLink(value: pane.id) {
                                     PaneRow(pane: pane)
                                 }
                             }
+                        } header: {
+                            SectionEyebrow(tab.label)
                         }
                     }
                 }
@@ -40,22 +42,27 @@ private struct PaneRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: pane.isAgent ? "cpu" : "terminal")
-                .foregroundStyle(pane.isAgent ? Color.accentColor : .secondary)
-                .frame(width: 22)
+                .font(.callout)
+                .foregroundStyle(pane.isAgent ? Theme.ink : Color.secondary)
+                .frame(width: 24)
             VStack(alignment: .leading, spacing: 3) {
                 Text(pane.title).font(.body.weight(.medium)).lineLimit(1)
                 HStack(spacing: 8) {
-                    Text(pane.id.rawValue).font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                    Text(pane.id.rawValue)
+                        .font(Theme.mono(11))
+                        .foregroundStyle(.tertiary)
                     if let agent = pane.agent {
-                        Text(agent).font(.caption2).foregroundStyle(.secondary)
+                        Text(agent)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
-            Spacer()
+            Spacer(minLength: 8)
             if pane.isAgent {
                 StatusTag(status: pane.status)
             }
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 4)
     }
 }

@@ -54,6 +54,12 @@ channel running `socat - UNIX-CONNECT:<path> || nc -U <path>`, writing
 `NDJSON.frame(request)` to stdin and feeding stdout through `LineBuffer` →
 `IncomingMessage.decode`. Auth uses `SSHClient.connect` (password or RSA key).
 
+The socket path is **auto-detected** unless `Host.socketPath` is a non-blank
+override: a one-shot `executeCommand` probe mirrors Herdr's documented resolution
+order (`$HERDR_SOCKET_PATH` → `~/.config/herdr/herdr.sock` → named sessions under
+`~/.config/herdr/sessions/*/`) and picks the first live socket. So `Host.socketPath`
+defaults to `""` (auto) — don't reintroduce a hardcoded default.
+
 Package deps live in `project.yml`: `Citadel`, plus `NIOCore` (for `ByteBuffer`)
 and `Crypto` (for the `Insecure` namespace Citadel extends) — both are Citadel
 transitive deps that `SSHTransport` imports directly, so they're linked

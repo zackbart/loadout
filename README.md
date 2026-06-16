@@ -86,12 +86,17 @@ its panes/agents, and open a pane to watch streamed output and send input.
 1. `connect()` opens an `SSHClient` connection authenticated with the host's
    `Credential` (password, or an OpenSSH-format RSA private key, from the
    Keychain).
-2. It then opens a `withExec` channel running
+2. Unless the host has an explicit socket-path override, it **auto-detects** the
+   socket: a one-shot remote probe mirrors Herdr's documented resolution order —
+   `$HERDR_SOCKET_PATH`, then the default `~/.config/herdr/herdr.sock`, then any
+   named session under `~/.config/herdr/sessions/<name>/` — and picks the first
+   live socket (`test -S`). Users normally don't configure a path at all.
+3. It then opens a `withExec` channel running
    `socat - UNIX-CONNECT:<socketPath> || nc -U <socketPath>` and suspends until
    the channel is live. The channel's stdout is fed through the existing
    `LineBuffer` → `IncomingMessage.decode` → `continuation.yield`; `send(_:)`
-   writes `NDJSON.frame(request)` to the channel's stdin. A leading `~` in the
-   socket path is rewritten to `$HOME` so the remote shell expands it.
+   writes `NDJSON.frame(request)` to the channel's stdin. A leading `~` in an
+   overridden socket path is rewritten to `$HOME` so the remote shell expands it.
 
 To switch the app onto SSH, point `AppModel.connect(to:)` at a saved `Host` (it
 already builds an `SSHTransport`); the demo entry point stays on the Mock.
@@ -103,6 +108,10 @@ already builds an `SSHTransport`); the demo entry point stays on the Mock.
   for everything in the meantime.
 - Host keys are accepted via `.acceptAnything()`. Add trust-on-first-use pinning
   before treating this as secure against MITM.
+- Socket auto-detect picks the default session, or the sole running one. When a
+  host has *multiple* named sessions and no default, it currently picks the first;
+  a session picker is a possible follow-up (override the socket path to choose for
+  now).
 - Confirm the exact socket `method` strings and subscribe/event names in
   `Sources/HerdrKit/Protocol/Method.swift` against
   <https://herdr.dev/docs/socket-api/>.

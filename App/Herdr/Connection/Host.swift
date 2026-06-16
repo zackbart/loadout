@@ -24,9 +24,11 @@ struct Host: Identifiable, Codable, Hashable, Sendable {
     var port: Int = 22
     var username: String = ""
     var authMethod: AuthMethod = .privateKey
-    /// Path to the Herdr socket on the remote host. Default is the primary
-    /// session; named sessions live under `~/.config/herdr/sessions/<n>/`.
-    var socketPath: String = "~/.config/herdr/herdr.sock"
+    /// Optional override for the remote Herdr socket. Blank = auto-detect on
+    /// connect: the default session (`~/.config/herdr/herdr.sock`), or the sole
+    /// running session under `~/.config/herdr/sessions/<n>/`. Set this only to
+    /// target a specific named session or a non-standard path.
+    var socketPath: String = ""
 
     var displayName: String {
         nickname.isEmpty ? "\(username)@\(hostname)" : nickname
