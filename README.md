@@ -12,11 +12,24 @@ Stop digging through dotfiles to see what each agent is actually loaded with.
 
 ## Install
 
+Via [Homebrew](https://brew.sh) (the `zackbart/tap/loadout` shorthand taps automatically):
+
 ```bash
 brew install --cask zackbart/tap/loadout
 ```
 
-Signed and notarized, so it opens with a normal double-click. Requires macOS 26+.
+Or tap first, then install by name:
+
+```bash
+brew tap zackbart/tap
+brew install --cask loadout
+```
+
+Upgrade to the latest release with `brew upgrade --cask loadout`, and remove with
+`brew uninstall --cask loadout`.
+
+The app is signed and notarized, so it opens with a normal double-click — no Gatekeeper
+right-click dance. Requires **macOS 26+**.
 
 ## What it does (v0.1)
 
