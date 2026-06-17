@@ -94,16 +94,6 @@ public actor HerdrClient {
         try await readLines(pane, source: PaneReadSource.recent, lines: lines)
     }
 
-    /// Read the agent "status" region: the bottom-buffer snapshot the server uses
-    /// for agent screen detection — an agent's live footer (current task, active
-    /// subagents, context budget, mode). Raw terminal text (ANSI preserved), not
-    /// structured fields; the UI colorizes it. The only way to keep it live is to
-    /// poll, since the socket API pushes no pane-output events.
-    public func readAgentStatus(_ pane: PaneID) async throws -> [String] {
-        // `detection` is a fixed bottom-buffer snapshot — no `lines` bound applies.
-        try await readLines(pane, source: PaneReadSource.detection, lines: nil)
-    }
-
     private func readLines(_ pane: PaneID, source: String, lines: Int?) async throws -> [String] {
         var params: [String: JSONValue] = [
             "pane_id": .string(pane.rawValue),

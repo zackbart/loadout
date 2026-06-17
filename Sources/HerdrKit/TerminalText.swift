@@ -65,27 +65,4 @@ public enum TerminalText {
         }
         return out
     }
-
-    /// Remove the trailing footer block (the `detection` snapshot) from a
-    /// scrollback read so the pinned status strip and the transcript don't show
-    /// the same current-screen lines twice. Comparison is normalized (ANSI and
-    /// frame characters stripped) and confined to the tail so older, legitimately
-    /// repeated content is never deleted.
-    public static func removeOverlap(scrollback: [String], footer: [String]) -> [String] {
-        let footerSet = Set(footer.map(normalize).filter { !$0.isEmpty })
-        guard !footerSet.isEmpty else { return scrollback }
-        var end = scrollback.count
-        let limit = max(0, scrollback.count - (footer.count + 5))
-        while end > limit {
-            let norm = normalize(scrollback[end - 1])
-            if norm.isEmpty || footerSet.contains(norm) { end -= 1 } else { break }
-        }
-        return Array(scrollback.prefix(end))
-    }
-
-    /// Visible text with ANSI and edge frame/padding stripped, for comparison.
-    private static func normalize(_ s: String) -> String {
-        let edges = CharacterSet(charactersIn: " \t│┃|─═-=_")
-        return stripANSI(s).trimmingCharacters(in: edges)
-    }
 }

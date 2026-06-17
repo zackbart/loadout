@@ -20,7 +20,6 @@ struct PaneView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            statusStrip
             scrollback
             Rectangle()
                 .fill(Theme.terminalDim.opacity(0.18))
@@ -62,39 +61,10 @@ struct PaneView: View {
     /// Restart the loop when the pane changes or the Raw sheet opens/closes.
     private var pollKey: String { "\(paneID.rawValue)|\(showingRaw)" }
 
-    /// Pinned, auto-refreshing projection of the agent's status footer (task,
-    /// subagents, context, mode), cleaned of grid framing and color-preserved.
-    /// Wraps vertically (no horizontal scroll); caps height and scrolls if tall.
-    @ViewBuilder private var statusStrip: some View {
-        if let pane, pane.isAgent, let status = session.statusLines[paneID], !status.isEmpty {
-            VStack(alignment: .leading, spacing: 5) {
-                SectionEyebrow("status")
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(Array(status.enumerated()), id: \.offset) { _, line in
-                            Text(line.ansiAttributed(defaultColor: Theme.terminalText))
-                                .font(Theme.mono(12))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                .frame(maxHeight: 132)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.terminalSurface)
-            .overlay(alignment: .bottom) {
-                Rectangle().fill(Theme.terminalDim.opacity(0.18)).frame(height: 1)
-            }
-        }
-    }
-
     private var scrollback: some View {
         ScrollViewReader { proxy in
-            // Mobile transcript: cleaned output (frames stripped, footer deduped
-            // upstream) wraps vertically — no horizontal scroll. Color preserved.
+            // Mobile transcript: cleaned output (frames stripped) wraps
+            // vertically — no horizontal scroll. Color preserved.
             ScrollView(.vertical) {
                 LazyVStack(alignment: .leading, spacing: 4) {
                     if lines.isEmpty {
@@ -144,6 +114,7 @@ struct PaneView: View {
             keyButton("arrow.up", sends: "Up")
             keyButton("arrow.down", sends: "Down")
             keyButton("arrow.right", sends: "Right")
+            keyButton("return", sends: "Enter")
             Button { inputFocused = false } label: {
                 Image(systemName: "keyboard.chevron.compact.down")
                     .foregroundStyle(Theme.prompt)

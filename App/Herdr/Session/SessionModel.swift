@@ -14,9 +14,6 @@ final class SessionModel {
     var workspaces: [Workspace] = []
     /// Scrollback lines per pane, populated by `loadOutput` and grown by events.
     var outputs: [PaneID: [String]] = [:]
-    /// The agent status-region snapshot per pane (raw, ANSI-bearing lines from
-    /// `pane.read` `detection`), refreshed by polling while a pane is open.
-    var statusLines: [PaneID: [String]] = [:]
     var loadError: String?
 
     private var eventTask: Task<Void, Never>?
@@ -67,19 +64,16 @@ final class SessionModel {
         }
     }
 
-    /// Refresh a pane's display in one pass: read the scrollback and (for agents)
-    /// the status footer concurrently, project both into a readable mobile
-    /// transcript, and drop the footer from the scrollback so it isn't shown
-    /// twice. Best-effort — a failed read leaves the last snapshot in place.
+    /// Refresh a pane's display: read the scrollback and project it into a
+    /// readable mobile transcript. One region — the agent's own status footer
+    /// rides inline in the transcript like any other terminal output, rather
+    /// than being scraped out into a separate pinned strip (the old `detection`
+    /// scrape mis-classified full-screen TUI prompts as "status"). Best-effort —
+    /// a failed read leaves the last snapshot in place.
+    /// `isAgent` is unused now but kept so the call site needn't special-case.
     func refreshPaneDisplay(for pane: PaneID, isAgent: Bool) async {
-        async let recentTask = client.readPane(pane)
-        async let detectionTask: [String] = isAgent ? client.readAgentStatus(pane) : []
-        let recent = (try? await recentTask) ?? outputs[pane] ?? []
-        let detection = (try? await detectionTask) ?? []
-
-        if isAgent { statusLines[pane] = TerminalText.clean(detection) }
-        let deduped = TerminalText.removeOverlap(scrollback: recent, footer: detection)
-        outputs[pane] = TerminalText.clean(deduped)
+        let recent = (try? await client.readPane(pane)) ?? outputs[pane] ?? []
+        outputs[pane] = TerminalText.clean(recent)
     }
 
     /// Block until the pane produces new output (or the server's wait times out),

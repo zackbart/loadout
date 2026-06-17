@@ -35,22 +35,4 @@ final class TerminalTextTests: XCTestCase {
         let cleaned = TerminalText.clean(["│ \u{1B}[36mctx\u{1B}[0m │"])
         XCTAssertEqual(cleaned, ["\u{1B}[36mctx\u{1B}[0m"])
     }
-
-    func testRemoveOverlapDropsFooterTail() {
-        let scrollback = ["intro", "body", "context 25%", "bypass on"]
-        let footer = ["context 25%", "bypass on"]
-        XCTAssertEqual(TerminalText.removeOverlap(scrollback: scrollback, footer: footer),
-                       ["intro", "body"])
-    }
-
-    func testRemoveOverlapKeepsEverythingWhenNoFooter() {
-        let scrollback = ["a", "b", "c"]
-        XCTAssertEqual(TerminalText.removeOverlap(scrollback: scrollback, footer: []), scrollback)
-    }
-
-    func testRemoveOverlapMatchesAcrossANSIAndBorders() {
-        let scrollback = ["work", "│ \u{1B}[33mBuild [heavy]\u{1B}[0m │"]
-        let footer = ["Build [heavy]"]
-        XCTAssertEqual(TerminalText.removeOverlap(scrollback: scrollback, footer: footer), ["work"])
-    }
 }
