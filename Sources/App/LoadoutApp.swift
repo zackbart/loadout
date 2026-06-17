@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SkillzApp: App {
+struct LoadoutApp: App {
     @StateObject private var state = AppState()
 
     var body: some Scene {

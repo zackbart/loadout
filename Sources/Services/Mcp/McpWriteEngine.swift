@@ -100,7 +100,7 @@ enum McpWriteEngine {
         let fm = FileManager.default
         let dir = url.deletingLastPathComponent()
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        let tmp = dir.appendingPathComponent(".\(url.lastPathComponent).skillz-\(UUID().uuidString)")
+        let tmp = dir.appendingPathComponent(".\(url.lastPathComponent).loadout-\(UUID().uuidString)")
         do {
             try data.write(to: tmp, options: .atomic)
             if let fh = try? FileHandle(forWritingTo: tmp) {

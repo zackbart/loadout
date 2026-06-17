@@ -1,5 +1,5 @@
 import XCTest
-@testable import Skillz
+@testable import Loadout
 
 /// Round-trip + regression tests for the MCP config codec/write path — the only code that
 /// edits the user's real config files, where a bug silently corrupts rather than crashes.
@@ -200,7 +200,7 @@ final class CodecTests: XCTestCase {
 
     private func tempDir() throws -> URL {
         let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("skillz-tests-\(UUID().uuidString)")
+            .appendingPathComponent("loadout-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
         return dir

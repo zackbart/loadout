@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The kinds of resource Skillz can manage: agent skills (directories) and MCP
+/// The kinds of resource Loadout can manage: agent skills (directories) and MCP
 /// servers (entries inside shared config files). See DECISIONS D3.
 enum ResourceKind: String, Hashable, CaseIterable {
     case skill

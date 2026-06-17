@@ -1,10 +1,11 @@
-# Skillz
+# Loadout
 
-A native macOS app that shows every AI-agent **skill** installed on your machine —
-across **Claude Code, OpenCode, Codex, and Pi** — at both the global and (soon) project
-level, with tight integration to the [skills.sh](https://skills.sh) / `npx skills` ecosystem.
+A native macOS app that shows every AI-agent **skill** and **MCP server** configured on your
+machine — across **Claude Code, OpenCode, Codex, Cursor, and Pi** — at both the global and
+project level, with tight integration to the [skills.sh](https://skills.sh) / `npx skills`
+ecosystem.
 
-Stop digging through dotfiles to see what skills each agent actually has.
+Stop digging through dotfiles to see what each agent is actually loaded with.
 
 > Clean-room, MIT-licensed. Informed by `RESEARCH.md` (verified ecosystem research) and
 > by Chops (`Shpigford/chops`) as a UX reference only — no code or assets are copied.
@@ -33,8 +34,8 @@ Stop digging through dotfiles to see what skills each agent actually has.
 
 ```bash
 brew install xcodegen        # one-time
-xcodegen generate            # generates Skillz.xcodeproj from project.yml
-open Skillz.xcodeproj         # then ⌘R
+xcodegen generate            # generates Loadout.xcodeproj from project.yml
+open Loadout.xcodeproj        # then ⌘R
 ```
 
 The Xcode project is generated — edit `project.yml`, not the `.xcodeproj`.

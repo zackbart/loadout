@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The coding harnesses Skillz manages MCP servers for. This is a DISTINCT axis from
+/// The coding harnesses Loadout manages MCP servers for. This is a DISTINCT axis from
 /// `Agent` (the skills axis), and the difference is the whole point: Pi is a skills-only
 /// agent and is absent here; Cursor is an MCP-only target and is absent from `Agent`.
 /// Modelling MCP through `Agent` capability flags couldn't even represent Cursor, so the
