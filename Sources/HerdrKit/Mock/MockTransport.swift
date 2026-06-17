@@ -6,7 +6,7 @@ import Foundation
 /// `{"event":…}` envelopes) and the real one-request-per-connection model. This
 /// is the default transport the app boots on.
 public actor MockTransport: HerdrTransport {
-    private let workspaces: [Workspace]
+    private var workspaces: [Workspace]
     private let output: [PaneID: [String]]
     private let agentPaneIDs: [PaneID]
     private let tickInterval: Duration
@@ -49,8 +49,8 @@ public actor MockTransport: HerdrTransport {
                     result: .object(["type": .string("subscription_started")]),
                     error: nil
                 )))
-                let interval = await self.tickInterval
-                let agentPanes = await self.agentPaneIDs
+                let interval = self.tickInterval
+                let agentPanes = self.agentPaneIDs
                 let targets = subscribedPanes.filter(agentPanes.contains)
                 guard !targets.isEmpty else { return } // topology-only: ack, no status ticks
                 while !Task.isCancelled {
@@ -70,6 +70,20 @@ public actor MockTransport: HerdrTransport {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    /// A fake agent status footer (the `detection` snapshot) with ANSI color, so
+    /// the demo exercises the pane's live status strip. Empty for non-agent panes.
+    private func mockStatus(for pane: PaneID?) -> String {
+        guard let pane, agentPaneIDs.contains(pane) else { return "" }
+        let e = "\u{1B}["
+        return [
+            "free-screentime-app · Opus 4.8",
+            "\(e)36mcontext\(e)0m ▓▓░░░░░░░░ 17%   \(e)32mgit:main*\(e)0m",
+            "\(e)33m🔨 Build [heavy]\(e)0m critic:auto 1m50s",
+            "  └ Build Free Screentime v1 per docs/V1_SCOPE.md…",
+            "\(e)35m▶▶ bypass permissions on\(e)0m (shift+tab to cycle)",
+        ].joined(separator: "\n")
     }
 
     /// All panes flattened, paired with their workspace/tab ids.
@@ -129,10 +143,45 @@ public actor MockTransport: HerdrTransport {
 
         case Method.paneRead:
             let pane = request.params["pane_id"]?.stringValue.map { PaneID($0) }
-            let text = (pane.flatMap { output[$0] } ?? []).joined(separator: "\n")
+            let text: String
+            if request.params["source"]?.stringValue == PaneReadSource.detection {
+                text = mockStatus(for: pane) // agent footer (ANSI-colored), else empty
+            } else {
+                text = (pane.flatMap { output[$0] } ?? []).joined(separator: "\n")
+            }
             result = .object(["type": .string("pane_read"), "read": .object([
                 "text": .string(text),
                 "format": .string("text"),
+            ])])
+
+        case Method.workspaceCreate:
+            let cwd = request.params["cwd"]?.stringValue
+            let id = "ws-mock\(workspaces.count + 1)"
+            let label = request.params["label"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 } ?? id
+            let pane = Pane(id: PaneID("\(id)-p1"), title: "shell", isFocused: true, cwd: cwd)
+            let workspace = Workspace(id: WorkspaceID(id), label: label, cwd: cwd,
+                                      tabs: [Tab(id: TabID("\(id)-t1"), label: "main", panes: [pane])])
+            workspaces.append(workspace)
+            result = .object(["type": .string("workspace_info"), "workspace": .object([
+                "workspace_id": .string(id),
+                "label": .string(label),
+            ])])
+
+        case Method.tabCreate:
+            let wsID = request.params["workspace_id"]?.stringValue ?? ""
+            guard let idx = workspaces.firstIndex(where: { $0.id.rawValue == wsID }) else {
+                return RPCResponse(id: request.id, result: nil, error: RPCError(
+                    code: "not_found", message: "No such workspace: \(wsID)"))
+            }
+            let number = workspaces[idx].tabs.count + 1
+            let tabID = "\(wsID)-t\(number)"
+            let label = request.params["label"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 } ?? "tab \(number)"
+            let pane = Pane(id: PaneID("\(tabID)-p1"), title: "shell", cwd: workspaces[idx].cwd)
+            workspaces[idx].tabs.append(Tab(id: TabID(tabID), label: label, panes: [pane]))
+            result = .object(["type": .string("tab_info"), "tab": .object([
+                "tab_id": .string(tabID),
+                "workspace_id": .string(wsID),
+                "label": .string(label),
             ])])
 
         default:

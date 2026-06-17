@@ -6,9 +6,11 @@ import HerdrKit
 struct WorkspaceListView: View {
     @Environment(SessionModel.self) private var session
     @Environment(AppModel.self) private var app
+    @State private var path = NavigationPath()
+    @State private var showingNewWorkspace = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 if let error = session.loadError {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -31,10 +33,13 @@ struct WorkspaceListView: View {
             .overlay {
                 if session.workspaces.isEmpty && session.loadError == nil {
                     ContentUnavailableView("No workspaces", systemImage: "rectangle.3.group",
-                                           description: Text("Create one with `herdr workspace create`."))
+                                           description: Text("Tap + to create your first workspace."))
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingNewWorkspace) {
+                NewWorkspaceSheet { newID in path.append(newID) }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { Task { await app.disconnect() } } label: {
@@ -42,6 +47,11 @@ struct WorkspaceListView: View {
                     }
                     .tint(Theme.ink)
                     .accessibilityLabel("Disconnect")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showingNewWorkspace = true } label: { Image(systemName: "plus") }
+                        .tint(Theme.ink)
+                        .accessibilityLabel("New workspace")
                 }
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
@@ -94,5 +104,79 @@ private struct WorkspaceRow: View {
         }
         .padding(.vertical, 6)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Sheet for `workspace.create`. Label and cwd are both optional (the server
+/// defaults them); on success it dismisses and hands the new id back so the list
+/// can navigate into it. Failures stay inline so the user can fix and retry.
+private struct NewWorkspaceSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(SessionModel.self) private var session
+    @State private var label = ""
+    @State private var cwd = ""
+    @State private var isCreating = false
+    @State private var error: String?
+    let onCreated: (WorkspaceID) -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Label (optional)", text: $label)
+                        .autocorrectionDisabled()
+                    TextField("Working directory (optional)", text: $cwd)
+                        .font(.caption.monospaced())
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    SectionEyebrow("workspace")
+                } footer: {
+                    Text("Both optional. The working directory is a path on the Herdr host (e.g. ~/project); leave blank to use the server's default.")
+                }
+
+                if let error {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.callout)
+                            .foregroundStyle(Theme.blocked)
+                    }
+                }
+            }
+            .navigationTitle("New workspace")
+            .navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(isCreating)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.disabled(isCreating)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isCreating {
+                        ProgressView()
+                    } else {
+                        Button("Create") { create() }
+                    }
+                }
+            }
+        }
+        .tint(Theme.prompt)
+    }
+
+    private func create() {
+        isCreating = true
+        error = nil
+        Task {
+            do {
+                let id = try await session.createWorkspace(
+                    label: label.trimmingCharacters(in: .whitespacesAndNewlines),
+                    cwd: cwd.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+                dismiss()
+                if let id { onCreated(id) }
+            } catch {
+                self.error = String(describing: error)
+                isCreating = false
+            }
+        }
     }
 }

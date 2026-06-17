@@ -55,4 +55,48 @@ final class ClientTests: XCTestCase {
         try await client.connect()
         try await client.subscribe([.topology]) // must not throw or hang
     }
+
+    /// `workspace.create` returns the new id and a subsequent list reflects it.
+    func testCreateWorkspaceReturnsIDAndAppears() async throws {
+        let client = HerdrClient(transport: MockTransport(tickInterval: .seconds(3600)))
+        try await client.connect()
+        let before = try await client.listWorkspaces().count
+
+        let id = try await client.createWorkspace(label: "scratch", cwd: "~/tmp")
+        XCTAssertNotNil(id, "the mock reports the new workspace id")
+
+        let after = try await client.listWorkspaces()
+        XCTAssertEqual(after.count, before + 1)
+        let created = after.first { $0.id == id }
+        XCTAssertEqual(created?.label, "scratch")
+        XCTAssertEqual(created?.cwd, "~/tmp")
+    }
+
+    /// `tab.create` adds a tab to the target workspace; an empty label is dropped
+    /// from the request so the server names it.
+    func testCreateTabAddsTabToWorkspace() async throws {
+        let client = HerdrClient(transport: MockTransport(tickInterval: .seconds(3600)))
+        try await client.connect()
+        let workspace = try await client.listWorkspaces()[0]
+        let tabsBefore = workspace.tabs.count
+
+        let tabID = try await client.createTab(label: "", in: workspace.id)
+        XCTAssertNotNil(tabID)
+
+        let updated = try await client.listWorkspaces().first { $0.id == workspace.id }
+        XCTAssertEqual(updated?.tabs.count, tabsBefore + 1)
+        XCTAssertEqual(updated?.tabs.last?.id, tabID)
+    }
+
+    /// Creating a tab in a non-existent workspace surfaces the server's RPC error.
+    func testCreateTabInUnknownWorkspaceThrows() async throws {
+        let client = HerdrClient(transport: MockTransport(tickInterval: .seconds(3600)))
+        try await client.connect()
+        do {
+            _ = try await client.createTab(label: "x", in: "no-such-ws")
+            XCTFail("expected an RPC error for an unknown workspace")
+        } catch let HerdrError.rpc(error) {
+            XCTAssertEqual(error.code, "not_found")
+        }
+    }
 }

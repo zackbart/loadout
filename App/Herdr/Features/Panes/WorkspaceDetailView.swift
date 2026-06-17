@@ -7,6 +7,7 @@ import HerdrKit
 struct WorkspaceDetailView: View {
     @Environment(SessionModel.self) private var session
     let workspaceID: WorkspaceID
+    @State private var showingNewTab = false
 
     private var workspace: Workspace? { session.workspace(workspaceID) }
 
@@ -28,9 +29,86 @@ struct WorkspaceDetailView: View {
                 }
                 .navigationTitle(workspace.label)
                 .navigationBarTitleDisplayMode(.inline)
+                .sheet(isPresented: $showingNewTab) {
+                    NewTabSheet(workspaceID: workspaceID)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { showingNewTab = true } label: { Image(systemName: "plus") }
+                            .tint(Theme.ink)
+                            .accessibilityLabel("New tab")
+                    }
+                }
             } else {
                 ContentUnavailableView("Workspace closed", systemImage: "xmark.rectangle",
                                        description: Text("This workspace is no longer available."))
+            }
+        }
+    }
+}
+
+/// Sheet for `tab.create` in a fixed workspace. Label is optional; the new tab
+/// appears as a section once the post-create refresh lands. Failures stay inline.
+private struct NewTabSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(SessionModel.self) private var session
+    let workspaceID: WorkspaceID
+    @State private var label = ""
+    @State private var isCreating = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Label (optional)", text: $label)
+                        .autocorrectionDisabled()
+                } header: {
+                    SectionEyebrow("tab")
+                } footer: {
+                    Text("Optional. Leave blank to use the server's default name.")
+                }
+
+                if let error {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.callout)
+                            .foregroundStyle(Theme.blocked)
+                    }
+                }
+            }
+            .navigationTitle("New tab")
+            .navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(isCreating)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.disabled(isCreating)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isCreating {
+                        ProgressView()
+                    } else {
+                        Button("Create") { create() }
+                    }
+                }
+            }
+        }
+        .tint(Theme.prompt)
+    }
+
+    private func create() {
+        isCreating = true
+        error = nil
+        Task {
+            do {
+                try await session.createTab(
+                    label: label.trimmingCharacters(in: .whitespacesAndNewlines),
+                    in: workspaceID
+                )
+                dismiss()
+            } catch {
+                self.error = String(describing: error)
+                isCreating = false
             }
         }
     }

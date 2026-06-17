@@ -14,6 +14,9 @@ final class SessionModel {
     var workspaces: [Workspace] = []
     /// Scrollback lines per pane, populated by `loadOutput` and grown by events.
     var outputs: [PaneID: [String]] = [:]
+    /// The agent status-region snapshot per pane (raw, ANSI-bearing lines from
+    /// `pane.read` `detection`), refreshed by polling while a pane is open.
+    var statusLines: [PaneID: [String]] = [:]
     var loadError: String?
 
     private var eventTask: Task<Void, Never>?
@@ -64,12 +67,24 @@ final class SessionModel {
         }
     }
 
-    func loadOutput(for pane: PaneID) async {
-        do {
-            outputs[pane] = try await client.readPane(pane)
-        } catch {
-            outputs[pane] = ["[error reading pane: \(error)]"]
-        }
+    /// Refresh a pane's display in one pass: read the scrollback and (for agents)
+    /// the status footer concurrently, project both into a readable mobile
+    /// transcript, and drop the footer from the scrollback so it isn't shown
+    /// twice. Best-effort — a failed read leaves the last snapshot in place.
+    func refreshPaneDisplay(for pane: PaneID, isAgent: Bool) async {
+        async let recentTask = client.readPane(pane)
+        async let detectionTask: [String] = isAgent ? client.readAgentStatus(pane) : []
+        let recent = (try? await recentTask) ?? outputs[pane] ?? []
+        let detection = (try? await detectionTask) ?? []
+
+        if isAgent { statusLines[pane] = TerminalText.clean(detection) }
+        let deduped = TerminalText.removeOverlap(scrollback: recent, footer: detection)
+        outputs[pane] = TerminalText.clean(deduped)
+    }
+
+    /// The exact terminal grid for a pane, for the Raw inspector (uncleaned).
+    func rawTerminal(for pane: PaneID) async -> [String] {
+        (try? await client.readRawTerminal(pane)) ?? []
     }
 
     /// Submit a line of input (text + Enter), echoing it optimistically.
@@ -81,6 +96,26 @@ final class SessionModel {
 
     func sendKeys(_ keys: String, to pane: PaneID) async {
         try? await client.sendKeys(keys, to: pane)
+    }
+
+    /// Create a workspace, then re-list so the new one is in `workspaces` before
+    /// the caller navigates into it. Returns its id when the server reports one.
+    /// Throws on failure so the presenting sheet can surface it inline (errors
+    /// here are transient and sheet-local, unlike the persistent `loadError`).
+    func createWorkspace(label: String?, cwd: String?) async throws -> WorkspaceID? {
+        let id = try await client.createWorkspace(label: label, cwd: cwd)
+        await refresh()
+        await syncSubscriptions()
+        return id
+    }
+
+    /// Create a tab in `workspace`, then re-list so it appears in the detail view.
+    @discardableResult
+    func createTab(label: String?, in workspace: WorkspaceID) async throws -> TabID? {
+        let id = try await client.createTab(label: label, in: workspace)
+        await refresh()
+        await syncSubscriptions()
+        return id
     }
 
     // MARK: Lookups

@@ -81,11 +81,32 @@ public actor HerdrClient {
         return workspaces
     }
 
-    /// Read recent scrollback for a pane, returned as lines.
+    /// Read a pane's scrollback as logical lines (`recent_unwrapped`, so the
+    /// server's terminal-width soft-wrapping isn't baked in — the right source to
+    /// re-wrap for a narrow screen). `TerminalText.clean` makes it mobile-ready.
     public func readPane(_ pane: PaneID, lines: Int = 200) async throws -> [String] {
+        try await readLines(pane, source: PaneReadSource.recentUnwrapped)
+    }
+
+    /// Read the exact terminal grid (`recent`, hard-wrapped to the server width).
+    /// Backs the "Raw" inspector; the default transcript view uses `readPane`.
+    public func readRawTerminal(_ pane: PaneID) async throws -> [String] {
+        try await readLines(pane, source: PaneReadSource.recent)
+    }
+
+    /// Read the agent "status" region: the bottom-buffer snapshot the server uses
+    /// for agent screen detection — an agent's live footer (current task, active
+    /// subagents, context budget, mode). Raw terminal text (ANSI preserved), not
+    /// structured fields; the UI colorizes it. The only way to keep it live is to
+    /// poll, since the socket API pushes no pane-output events.
+    public func readAgentStatus(_ pane: PaneID) async throws -> [String] {
+        try await readLines(pane, source: PaneReadSource.detection)
+    }
+
+    private func readLines(_ pane: PaneID, source: String) async throws -> [String] {
         let result = try await call(Method.paneRead, .object([
             "pane_id": .string(pane.rawValue),
-            "source": .string(PaneReadSource.recent),
+            "source": .string(source),
         ]))
         guard let text = try result.decodedSnake(PaneReadResult.self).read.text else { return [] }
         var split = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
@@ -115,6 +136,39 @@ public actor HerdrClient {
     public func submitLine(_ text: String, to pane: PaneID) async throws {
         try await sendText(text, to: pane)
         try await sendKeys("Enter", to: pane)
+    }
+
+    /// Create a new workspace. Both params are optional — the server fills in
+    /// defaults (an omitted `cwd` uses the server's working directory). Returns
+    /// the new workspace's id when the server reports one, so the caller can
+    /// navigate straight into it; `nil` if the result omits it (the tree still
+    /// re-lists, both via the explicit refresh and the `workspace_created` event).
+    public func createWorkspace(label: String? = nil, cwd: String? = nil) async throws -> WorkspaceID? {
+        var params: [String: JSONValue] = [:]
+        if let label, !label.isEmpty { params["label"] = .string(label) }
+        if let cwd, !cwd.isEmpty { params["cwd"] = .string(cwd) }
+        let result = try await call(Method.workspaceCreate, .object(params))
+        return Self.extractID(result, idKey: "workspace_id", nested: "workspace").map { WorkspaceID($0) }
+    }
+
+    /// Create a new tab in `workspace`. `label` is optional. Returns the new
+    /// tab's id when reported (same lenient parse / re-list contract as above).
+    public func createTab(label: String? = nil, in workspace: WorkspaceID) async throws -> TabID? {
+        var params: [String: JSONValue] = ["workspace_id": .string(workspace.rawValue)]
+        if let label, !label.isEmpty { params["label"] = .string(label) }
+        let result = try await call(Method.tabCreate, .object(params))
+        return Self.extractID(result, idKey: "tab_id", nested: "tab").map { TabID($0) }
+    }
+
+    /// Pull a created resource's id out of a create result, tolerating the shapes
+    /// Herdr might use: a top-level `<thing>_id`, a nested `{"<thing>":{…}}`
+    /// (mirroring `*.get`'s `{"type":"pane_info","pane":{…}}`), or a bare `id`.
+    /// Create's result body isn't pinned down in the docs, so parse defensively.
+    private static func extractID(_ result: JSONValue, idKey: String, nested: String) -> String? {
+        result[idKey]?.stringValue
+            ?? result[nested]?[idKey]?.stringValue
+            ?? result["id"]?.stringValue
+            ?? result[nested]?["id"]?.stringValue
     }
 
     /// Open live subscriptions on a persistent event channel. Each call opens

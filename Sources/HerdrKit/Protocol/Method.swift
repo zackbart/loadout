@@ -7,7 +7,9 @@ public enum Method {
 
     public static let workspaceList = "workspace.list"
     public static let workspaceGet = "workspace.get"
+    public static let workspaceCreate = "workspace.create"
     public static let tabList = "tab.list"
+    public static let tabCreate = "tab.create"
     public static let paneList = "pane.list"
     public static let paneGet = "pane.get"
     public static let agentList = "agent.list"
