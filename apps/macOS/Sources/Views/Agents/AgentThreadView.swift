@@ -10,6 +10,9 @@ import AgentContentKit
 /// Presentation only — no behavior/data changes.
 struct AgentThreadView: View {
     @ObservedObject var model: AgentsSessionModel
+    @State private var draft = ""
+    @State private var sending = false
+    @FocusState private var composerFocused: Bool
 
     private var selectedPane: AgentInfo? {
         guard let id = model.selectedPaneID else { return nil }
@@ -22,6 +25,7 @@ struct AgentThreadView: View {
                 topBar(pane)
                 Divider()
                 thread(pane)
+                composer(pane)
             }
         } else {
             ContentUnavailableView(
@@ -136,6 +140,50 @@ struct AgentThreadView: View {
             } else {
                 proxy.scrollTo(Self.bottomAnchor, anchor: .bottom)
             }
+        }
+    }
+
+    // MARK: - Composer (real input: submits a follow-up line to the pane)
+
+    @ViewBuilder
+    private func composer(_ pane: AgentInfo) -> some View {
+        let canSend = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !sending
+        HStack(alignment: .bottom, spacing: 8) {
+            TextField("Ask for follow-up changes…", text: $draft, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14))
+                .lineLimit(1...8)
+                .focused($composerFocused)
+                .onSubmit(send)            // Enter sends; Shift+Enter inserts a newline
+                .disabled(sending)
+            Button(action: send) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(canSend ? Color(hex: 0x1D4ED8) : Color.secondary.opacity(0.4), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSend)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 9)
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.quaternary))
+        .frame(maxWidth: 680)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 22).padding(.top, 8).padding(.bottom, 12)
+        .background(.bar)
+    }
+
+    private func send() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !sending else { return }
+        sending = true
+        draft = ""
+        Task {
+            await model.submit(text)
+            sending = false
+            composerFocused = true
         }
     }
 

@@ -70,4 +70,20 @@ final class AgentsSessionModel: ObservableObject {
         blocks = parsed
         status = parsed.isEmpty ? "Transcript is empty." : nil
     }
+
+    /// Submit a follow-up line (text + Enter) to the selected pane, then reload
+    /// its transcript so the new turn shows up (no live subscription yet).
+    func submit(_ text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let id = selectedPaneID,
+              let pane = panes.first(where: { $0.paneID == id }) else { return }
+        do {
+            try await client.submitLine(trimmed, to: id)
+        } catch {
+            status = "Couldn’t send: \(error.localizedDescription)"
+            return
+        }
+        await select(pane)
+    }
 }
