@@ -27,10 +27,15 @@ final class AgentsSessionModel: ObservableObject {
             let listed = try await client.listAgents()
             panes = listed
             status = listed.isEmpty ? "No live agent panes." : nil
-            // Drop a selection whose pane vanished.
-            if let sel = selectedPaneID, !listed.contains(where: { $0.paneID == sel }) {
-                selectedPaneID = nil
-                blocks = []
+            // Drop a selection whose pane vanished; otherwise reload its transcript
+            // so Refresh actually shows new content (no live subscription yet).
+            if let sel = selectedPaneID {
+                if let pane = listed.first(where: { $0.paneID == sel }) {
+                    await select(pane)
+                } else {
+                    selectedPaneID = nil
+                    blocks = []
+                }
             }
         } catch {
             status = "Couldn’t reach Herdr: \(error.localizedDescription)"

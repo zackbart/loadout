@@ -22,7 +22,6 @@ struct AgentThreadView: View {
                 topBar(pane)
                 Divider()
                 thread(pane)
-                composer(pane)
             }
         } else {
             ContentUnavailableView(
@@ -85,32 +84,57 @@ struct AgentThreadView: View {
 
     // MARK: - Thread (centered prose column)
 
+    /// Stable id for the bottom sentinel we scroll to — see `scrollToBottom`.
+    private static let bottomAnchor = "agent-thread-bottom"
+
     @ViewBuilder
     private func thread(_ pane: AgentInfo) -> some View {
-        ScrollView {
-            if model.blocks.isEmpty {
-                ContentUnavailableView(
-                    "Nothing to show",
-                    systemImage: "doc.text.magnifyingglass",
-                    description: Text(model.status ?? "Transcript is empty.")
-                )
-                .frame(maxWidth: .infinity).padding(.top, 48)
-            } else {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(items(model.blocks)) { item in
-                        switch item {
-                        case let .message(_, role, text):
-                            MessageRow(role: role, text: text, agentName: pane.agent)
-                        case let .plan(_, planItems):
-                            PlanSection(items: planItems)
-                        case let .workLog(_, blocks):
-                            WorkLogSection(blocks: blocks)
+        ScrollViewReader { proxy in
+            ScrollView {
+                if model.blocks.isEmpty {
+                    ContentUnavailableView(
+                        "Nothing to show",
+                        systemImage: "doc.text.magnifyingglass",
+                        description: Text(model.status ?? "Transcript is empty.")
+                    )
+                    .frame(maxWidth: .infinity).padding(.top, 48)
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        ForEach(items(model.blocks)) { item in
+                            switch item {
+                            case let .message(_, role, text):
+                                MessageRow(role: role, text: text, agentName: pane.agent)
+                            case let .plan(_, planItems):
+                                PlanSection(items: planItems)
+                            case let .workLog(_, blocks):
+                                WorkLogSection(blocks: blocks)
+                            }
                         }
+                        // Bottom sentinel: scroll target so the thread opens at the
+                        // latest message and follows new blocks as they arrive.
+                        Color.clear.frame(height: 1).id(Self.bottomAnchor)
                     }
+                    .padding(.horizontal, 22).padding(.vertical, 18)
+                    .frame(maxWidth: 680, alignment: .leading)
+                    .frame(maxWidth: .infinity)   // center the column
                 }
-                .padding(.horizontal, 22).padding(.vertical, 18)
-                .frame(maxWidth: 680, alignment: .leading)
-                .frame(maxWidth: .infinity)   // center the column
+            }
+            .onAppear { scrollToBottom(proxy, animated: false) }
+            .onChange(of: model.selectedPaneID) { _, _ in scrollToBottom(proxy, animated: false) }
+            .onChange(of: model.blocks.count) { _, _ in scrollToBottom(proxy, animated: true) }
+        }
+    }
+
+    private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard !model.blocks.isEmpty else { return }
+        // Defer a tick so the sentinel exists after a blocks/selection change.
+        Task { @MainActor in
+            if animated {
+                withAnimation(.easeOut(duration: 0.18)) {
+                    proxy.scrollTo(Self.bottomAnchor, anchor: .bottom)
+                }
+            } else {
+                proxy.scrollTo(Self.bottomAnchor, anchor: .bottom)
             }
         }
     }
@@ -139,70 +163,6 @@ struct AgentThreadView: View {
         return out
     }
 
-    // MARK: - Composer (T3-style, visual stub)
-
-    @ViewBuilder
-    private func composer(_ pane: AgentInfo) -> some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Ask for follow-up changes…")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 2)
-                HStack(spacing: 8) {
-                    composerPill(icon: "sparkle", "Claude Opus 4.8", chevron: true)
-                    Divider().frame(height: 16)
-                    composerPill(icon: "lock", "Full access", chevron: true)
-                    composerPill(icon: "hammer", "Build")
-                    composerPill(icon: "checklist", "Tasks")
-                    Spacer(minLength: 6)
-                    contextRing
-                    sendButton
-                }
-            }
-            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 9)
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.quaternary))
-            .frame(maxWidth: 680)
-            .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal, 22).padding(.top, 8).padding(.bottom, 12)
-        .background(.bar)
-    }
-
-    private func composerPill(icon: String, _ label: String, chevron: Bool = false) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(.system(size: 11))
-                .foregroundStyle(icon == "sparkle" ? AnyShapeStyle(AgentStyle.identityColor("claude")) : AnyShapeStyle(.secondary))
-            Text(label).font(.system(size: 12)).foregroundStyle(.secondary)
-            if chevron {
-                Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary)
-            }
-        }
-        .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(Color.secondary.opacity(0.001), in: RoundedRectangle(cornerRadius: 7))
-    }
-
-    private var contextRing: some View {
-        ZStack {
-            Circle().stroke(Color.secondary.opacity(0.18), lineWidth: 2.5).frame(width: 22, height: 22)
-            Circle().trim(from: 0, to: 0.32)
-                .stroke(Color(hex: 0x1D4ED8), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .frame(width: 22, height: 22)
-            Text("7").font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
-        }
-    }
-
-    private var sendButton: some View {
-        Image(systemName: "arrow.up")
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 30, height: 30)
-            .background(Color(hex: 0x1D4ED8), in: Circle())
-    }
 }
 
 // MARK: - Thread item model
