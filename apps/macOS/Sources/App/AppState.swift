@@ -112,9 +112,6 @@ final class AppState: ObservableObject {
     @Published var actionStatus: ActionStatus = .idle   // drives spinners / inline confirmations
     @Published var lastError: String?                   // alert binding (non-nil ⇒ show alert)
 
-    /// Live Agents axis — a parallel async source over the Herdr socket, NOT a filesystem
-    /// scan (so it bypasses scanCache/HostIO/FileWatcher entirely). See AgentsSessionModel.
-    let agentsModel = AgentsSessionModel()
     @Published var pendingSelectName: String?           // name to select once it appears post-reload
     @Published var pendingMcpSelectName: String?         // MCP equivalent (re-select after a write)
 
@@ -350,9 +347,6 @@ final class AppState: ObservableObject {
             if let sel = mcpSelection, !filteredMcpServers.contains(where: { $0.id == sel }) {
                 mcpSelection = nil
             }
-        case .agents:
-            // Agents selection lives in agentsModel and is reconciled there on refresh.
-            break
         }
     }
 
@@ -465,7 +459,6 @@ final class AppState: ObservableObject {
         switch kind {
         case .skill: reloadSkills()
         case .mcp: reloadMcp()
-        case .agents: Task { await agentsModel.refresh() }
         }
     }
 

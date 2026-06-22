@@ -15,8 +15,6 @@ struct SkillListView: View {
             switch state.kind {
             case .mcp:
                 McpListView()
-            case .agents:
-                AgentsListView(model: state.agentsModel)
             case .skill:
                 // Compute the filtered list once per render — body re-evaluates on every
                 // @Published change and this branch reads it for both the List and the overlay.
@@ -70,9 +68,6 @@ struct SkillListView: View {
                     .tint(Agent.claude.color)
                     .disabled(needsProject)
                     .help(needsProject ? "Choose a project first" : "Install a skill from a source")
-                case .agents:
-                    // No create affordance for live panes; Refresh is the only Agents action.
-                    EmptyView()
                 }
             }
             ToolbarItem(placement: .primaryAction) {

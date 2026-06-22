@@ -3,9 +3,10 @@
 #     brew install xcodegen
 #     xcodegen generate && open Loadout.xcodeproj
 #
-# This is a monorepo with two apps that share the local HerdrKit package:
-#   - Loadout      (macOS)  — sources in apps/macOS/Sources
-#   - LoadoutiOS   (iOS)     — sources in apps/iOS/Sources, displayed as "Loadout"
+# A monorepo with two apps:
+#   - Loadout      (macOS)  — skills + MCP management; sources in apps/macOS/Sources
+#   - LoadoutiOS   (iOS)     — Herdr terminal client (uses HerdrKit); apps/iOS/Sources,
+#                             displayed as "Loadout"
 name: Loadout
 options:
   bundleIdPrefix: dev.zackbart
@@ -19,8 +20,6 @@ packages:
     from: "5.0.6"
   HerdrKit:
     path: Packages/HerdrKit
-  LoadoutAgentKit:
-    path: Packages/LoadoutAgentKit
   # iOS-only SSH stack — powers apps/iOS/Sources/Connection/SSHTransport.swift.
   Citadel:
     url: https://github.com/orlandos-nl/Citadel.git
@@ -43,11 +42,6 @@ targets:
       - path: apps/macOS/Sources
     dependencies:
       - package: Yams
-      - package: HerdrKit
-      - package: LoadoutAgentKit
-        product: LocalSocketTransport
-      - package: LoadoutAgentKit
-        product: AgentContentKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.zackbart.loadout
