@@ -11,7 +11,8 @@ struct ContentView: View {
             SkillListView()
                 .navigationSplitViewColumnWidth(min: 300, ideal: 350)
         } detail: {
-            if state.kind == .skill {
+            switch state.kind {
+            case .skill:
                 if let skill = state.selectedSkill {
                     SkillDetailView(skill: skill)
                 } else {
@@ -21,7 +22,7 @@ struct ContentView: View {
                         description: Text("\(state.skills.count) \(state.scopeMode.label.lowercased()) skills across your agents")
                     )
                 }
-            } else {
+            case .mcp:
                 if let server = state.selectedMcpServer {
                     McpDetailView(server: server)
                 } else {
@@ -31,6 +32,8 @@ struct ContentView: View {
                         description: Text("\(state.mcpServers.count) \(state.scopeMode.label.lowercased()) MCP servers across your harnesses")
                     )
                 }
+            case .agents:
+                AgentThreadView(model: state.agentsModel)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { StatusBar() }
@@ -51,12 +54,13 @@ struct StatusBar: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            if state.kind == .skill {
+            switch state.kind {
+            case .skill:
                 Text("\(state.skills.count) skills")
                 dot
                 Text("\(state.driftCount) drift")
                     .foregroundStyle(state.driftCount > 0 ? Theme.drift : .secondary)
-            } else {
+            case .mcp:
                 Text("\(state.mcpServers.count) servers")
                 dot
                 Text("\(state.mcpDivergedCount) diverged")
@@ -67,6 +71,8 @@ struct StatusBar: View {
                           systemImage: "exclamationmark.triangle")
                         .foregroundStyle(Theme.drift)
                 }
+            case .agents:
+                AgentsStatusItem(model: state.agentsModel)
             }
             dot
             Text(state.scopeMode == .global ? "Global" : (state.selectedProject?.lastPathComponent ?? "Project"))
@@ -88,4 +94,12 @@ struct StatusBar: View {
     }
 
     private var dot: some View { Text("·").foregroundStyle(.tertiary) }
+}
+
+/// Live pane count for the Agents status bar — observes the model so it stays current.
+private struct AgentsStatusItem: View {
+    @ObservedObject var model: AgentsSessionModel
+    var body: some View {
+        Text("\(model.panes.count) panes")
+    }
 }

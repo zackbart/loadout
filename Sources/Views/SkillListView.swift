@@ -12,9 +12,12 @@ struct SkillListView: View {
 
     var body: some View {
         Group {
-            if state.kind == .mcp {
+            switch state.kind {
+            case .mcp:
                 McpListView()
-            } else {
+            case .agents:
+                AgentsListView(model: state.agentsModel)
+            case .skill:
                 // Compute the filtered list once per render — body re-evaluates on every
                 // @Published change and this branch reads it for both the List and the overlay.
                 let skills = state.filteredSkills
@@ -52,20 +55,24 @@ struct SkillListView: View {
                 }
             }
             ToolbarItem(placement: .primaryAction) {
-                if state.kind == .mcp {
+                switch state.kind {
+                case .mcp:
                     Button { showAddMcp = true } label: {
                         Label("Add MCP server…", systemImage: "plus")
                     }
                     .tint(McpHarness.claudeCode.color)
                     .disabled(needsProject)
                     .help(needsProject ? "Choose a project first" : "Add an MCP server to your harnesses")
-                } else {
+                case .skill:
                     Button { showInstall = true } label: {
                         Label("Install skill…", systemImage: "plus")
                     }
                     .tint(Agent.claude.color)
                     .disabled(needsProject)
                     .help(needsProject ? "Choose a project first" : "Install a skill from a source")
+                case .agents:
+                    // No create affordance for live panes; Refresh is the only Agents action.
+                    EmptyView()
                 }
             }
             ToolbarItem(placement: .primaryAction) {

@@ -111,6 +111,10 @@ final class AppState: ObservableObject {
     // Mutation surface
     @Published var actionStatus: ActionStatus = .idle   // drives spinners / inline confirmations
     @Published var lastError: String?                   // alert binding (non-nil ⇒ show alert)
+
+    /// Live Agents axis — a parallel async source over the Herdr socket, NOT a filesystem
+    /// scan (so it bypasses scanCache/HostIO/FileWatcher entirely). See AgentsSessionModel.
+    let agentsModel = AgentsSessionModel()
     @Published var pendingSelectName: String?           // name to select once it appears post-reload
     @Published var pendingMcpSelectName: String?         // MCP equivalent (re-select after a write)
 
@@ -337,14 +341,18 @@ final class AppState: ObservableObject {
     /// Clear the selection if it's no longer in the visible list (called from filter didSets).
     /// Reconciles whichever axis is active so the detail pane never shows a filtered-out row.
     func reconcileSelection() {
-        if kind == .skill {
+        switch kind {
+        case .skill:
             if let sel = selection, !filteredSkills.contains(where: { $0.id == sel }) {
                 selection = nil
             }
-        } else {
+        case .mcp:
             if let sel = mcpSelection, !filteredMcpServers.contains(where: { $0.id == sel }) {
                 mcpSelection = nil
             }
+        case .agents:
+            // Agents selection lives in agentsModel and is reconciled there on refresh.
+            break
         }
     }
 
@@ -454,7 +462,11 @@ final class AppState: ObservableObject {
     // MARK: - Loading
 
     func reload() {
-        kind == .skill ? reloadSkills() : reloadMcp()
+        switch kind {
+        case .skill: reloadSkills()
+        case .mcp: reloadMcp()
+        case .agents: Task { await agentsModel.refresh() }
+        }
     }
 
     private func reloadSkills() {

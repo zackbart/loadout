@@ -5,8 +5,15 @@ import SwiftUI
 enum ResourceKind: String, Hashable, CaseIterable {
     case skill
     case mcp
+    case agents
 
-    var displayName: String { self == .skill ? "Skills" : "MCP" }
+    var displayName: String {
+        switch self {
+        case .skill: return "Skills"
+        case .mcp: return "MCP"
+        case .agents: return "Agents"
+        }
+    }
 }
 
 /// Scope a resource was discovered in.

@@ -83,7 +83,8 @@ struct SidebarView: View {
                 .selectionDisabled()
             }
 
-            if state.kind == .skill {
+            switch state.kind {
+            case .skill:
                 Section("Library") {
                     row(.library(.all), "All", systemImage: "square.stack", count: state.skills.count)
                     row(.library(.drift), "Drift", systemImage: "exclamationmark.triangle",
@@ -108,7 +109,7 @@ struct SidebarView: View {
                         }
                     }
                 }
-            } else {
+            case .mcp:
                 Section("Library") {
                     row(.library(.all), "All", systemImage: "square.stack", count: state.mcpServers.count)
                     row(.library(.drift), "Missing", systemImage: "circle.dashed",
@@ -123,6 +124,21 @@ struct SidebarView: View {
                             dot: harness.color, count: state.mcpCount(for: harness))
                     }
                 }
+            case .agents:
+                // Minimal Machine section (T5b). Deeper facets (Workspaces/Library/Agents
+                // from the mockup) are deferred — don't touch AppState filter machinery.
+                Section("Machine") {
+                    HStack(spacing: 8) {
+                        Image(systemName: "desktopcomputer").foregroundStyle(Agent.claude.color)
+                        Text("Local").fontWeight(.semibold)
+                        Spacer()
+                        Image(systemName: "checkmark")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Agent.claude.color)
+                    }
+                    .listRowSeparator(.hidden)
+                }
+                .selectionDisabled()
             }
         }
         .listStyle(.sidebar)

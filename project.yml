@@ -8,6 +8,10 @@ packages:
   Yams:
     url: https://github.com/jpsim/Yams
     from: "5.0.6"
+  HerdrKit:
+    path: Packages/HerdrKit
+  LoadoutAgentKit:
+    path: Packages/LoadoutAgentKit
 targets:
   Loadout:
     type: application
@@ -16,6 +20,11 @@ targets:
       - path: Sources
     dependencies:
       - package: Yams
+      - package: HerdrKit
+      - package: LoadoutAgentKit
+        product: LocalSocketTransport
+      - package: LoadoutAgentKit
+        product: AgentContentKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.zackbart.loadout
