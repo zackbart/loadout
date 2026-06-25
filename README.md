@@ -1,4 +1,23 @@
-# Loadout
+<p align="center">
+  <a href="https://github.com/zackbart/loadout">
+    <img src="https://shieldcn.dev/header/graph.svg?title=Loadout&subtitle=see+every+AI-agent+skill+and+MCP+server+on+your+machine&logo=apple&mode=light&align=center&font=geist-mono&border=false" alt="Loadout">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/zackbart/loadout/releases/latest/download/Loadout.dmg">
+    <img src="https://shieldcn.dev/badge/Download-Loadout.dmg-blue.svg?logo=apple&size=lg" alt="Download the latest Loadout.dmg">
+  </a>
+  <a href="https://github.com/zackbart/loadout/releases/latest">
+    <img src="https://shieldcn.dev/github/release/zackbart/loadout.svg" alt="Latest release">
+  </a>
+  <a href="https://github.com/zackbart/loadout/blob/main/LICENSE">
+    <img src="https://shieldcn.dev/github/license/zackbart/loadout.svg" alt="License">
+  </a>
+  <a href="https://github.com/zackbart/loadout/stargazers">
+    <img src="https://shieldcn.dev/github/stars/zackbart/loadout.svg" alt="Stars">
+  </a>
+</p>
 
 A native macOS app that shows every AI-agent **skill** and **MCP server** configured on your
 machine — across **Claude Code, OpenCode, Codex, Cursor, and Pi** — at both the global and

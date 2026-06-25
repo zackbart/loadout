@@ -106,8 +106,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Stable-named copy so releases/latest/download/Loadout.dmg always
+          # resolves to the newest dmg (the README download button uses it).
+          STABLE="$RUNNER_TEMP/Loadout.dmg"
+          cp "${{ steps.dmg.outputs.path }}" "$STABLE"
           gh release create "$GITHUB_REF_NAME" \
-            "${{ steps.dmg.outputs.path }}" \
+            "${{ steps.dmg.outputs.path }}" "$STABLE" \
             --title "Loadout ${{ steps.ver.outputs.version }}" \
             --generate-notes
 
